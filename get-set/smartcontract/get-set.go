@@ -44,6 +44,7 @@ func (t *SimpleAsset) Invoke(stub shim.ChaincodeStubInterface) peer.Response {
 
 	//checking for account level access
 	channelId := stub.GetChannelID()
+	logger.Debug("cannelId: ", channelId)
 	accountAssertError := cid.AssertAttributeValue(stub, "ChannelId", channelId)
 	id, err = cid.GetID(stub)
 	if err != nil {
