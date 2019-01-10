@@ -36,7 +36,8 @@ func (t *SimpleAsset) Invoke(stub shim.ChaincodeStubInterface) peer.Response {
 	// Extract the function and args from the transaction proposal
 	var result string
 	var id string
-	var mspid string
+	var attrVal string
+	var found bool
 	var err error
 
 	fn, args := stub.GetFunctionAndParameters()
@@ -50,11 +51,12 @@ func (t *SimpleAsset) Invoke(stub shim.ChaincodeStubInterface) peer.Response {
 	}
 	logger.Debug("id: ", id)
 
-	mspid, err = cid.GetMSPID(stub)
+	attrVal, found, err = cid.GetAttributeValue(stub, "ChannelId")
 	if err != nil {
-		return shim.Error("error getmspid ")
+		return shim.Error("error getattrval")
 	}
-	logger.Debug("mspid: ", mspid)
+	logger.Debug("found: ", found)
+	logger.Debug("attrVal: ", attrVal)
 
 	if accountAssertError != nil {
 		return shim.Error(accountAssertError.Error())
