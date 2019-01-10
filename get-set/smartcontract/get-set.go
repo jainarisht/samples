@@ -77,6 +77,12 @@ func (t *SimpleAsset) getVersion(stub shim.ChaincodeStubInterface) peer.Response
 // it will override the value with the new one
 func (t *SimpleAsset) set(stub shim.ChaincodeStubInterface, args []string) peer.Response {
 	logger.Debug("set() called.")
+	creator, err1 := stub.GetCreator()
+	if err1 != nil {
+		logger.Error("Error occured while calling GetCreator(): ", err1)
+		return shim.Error("Failed to get creator")
+	}
+	logger.Debug(creator)
 	if len(args) != 2 {
 		logger.Error("Incorrect number of arguments passed in set.")
 		resp := shim.Error("Incorrect number of arguments. Expecting 2 arguments: " + strconv.Itoa(len(args)) + " given.")
@@ -96,7 +102,7 @@ func (t *SimpleAsset) set(stub shim.ChaincodeStubInterface, args []string) peer.
 func (t *SimpleAsset) get(stub shim.ChaincodeStubInterface, args []string) peer.Response {
 	logger.Debug("get() called.")
 	if len(args) != 1 {
-		resp := shim.Error("Incorrect number of arguments. Expecting 1 arguments: " + strconv.Itoa(len(args)) + " given.")
+		resp := shim.Error("Incorrect number of arguments. Expecting 1 argument: " + strconv.Itoa(len(args)) + " given.")
 		resp.Status = 400
 		return resp
 	}
