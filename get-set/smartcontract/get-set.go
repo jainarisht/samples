@@ -52,7 +52,7 @@ func (t *SimpleAsset) Invoke(stub shim.ChaincodeStubInterface) peer.Response {
 	}
 	logger.Debug("id: ", id)
 
-	attrVal, found, err = cid.GetAttributeValue(stub, "IdentityName")
+	attrVal, found, err = cid.GetAttributeValue(stub, "IdentityId")
 	if err != nil {
 		return shim.Error("error getattrval")
 	}
