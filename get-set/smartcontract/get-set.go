@@ -23,7 +23,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"strconv"
 
@@ -79,12 +78,11 @@ func (t *SimpleAsset) getVersion(stub shim.ChaincodeStubInterface) peer.Response
 func (t *SimpleAsset) set(stub shim.ChaincodeStubInterface, args []string) peer.Response {
 	logger.Debug("set() called.")
 	creatorInBytes, err1 := stub.GetCreator()
-	n := bytes.Index(creatorInBytes, []byte{0})
-	creator := string(creatorInBytes[:n])
 	if err1 != nil {
 		logger.Error("Error occured while calling GetCreator(): ", err1)
 		return shim.Error("Failed to get creator")
 	}
+	creator := fmt.Sprintf("%s", creatorInBytes)
 	logger.Debug(creator)
 	if len(args) != 2 {
 		logger.Error("Incorrect number of arguments passed in set.")
