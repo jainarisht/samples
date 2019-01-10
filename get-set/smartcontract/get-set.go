@@ -1,31 +1,15 @@
-/**
- *  Xooa get-set smart contract
- *
- *  Copyright 2018 Xooa
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- *  in compliance with the License. You may obtain a copy of the License at:
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
- *  for the specific language governing permissions and limitations under the License.
- */
 /*
- * Original source via IBM Corp:
- *  https://hyperledger-fabric.readthedocs.io/en/release-1.2/chaincode4ade.html#pulling-it-all-together
- *
- * Modifications from Xooa:
- *  https://github.com/xooa/samples
+ * Copyright Xooa
  */
 
 package main
 
 import (
 	"fmt"
-	"strconv"
+	"os"
+	"strings"
 
+	"github.com/hyperledger/fabric/core/chaincode/lib/cid"
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	"github.com/hyperledger/fabric/protos/peer"
 )
@@ -36,11 +20,12 @@ var logger = shim.NewLogger("get-setSC")
 type SimpleAsset struct {
 }
 
+// ...... checking if commit id gets updated
 // Init is called during chaincode instantiation to initialize any
 // data. Note that chaincode upgrade also calls this function to reset
 // or to migrate data.
 func (t *SimpleAsset) Init(stub shim.ChaincodeStubInterface) peer.Response {
-	logger.Debug("Init() called.")
+
 	return shim.Success(nil)
 }
 
@@ -48,84 +33,86 @@ func (t *SimpleAsset) Init(stub shim.ChaincodeStubInterface) peer.Response {
 // either a 'get' or a 'set' on the asset created by Init function. The Set
 // method may create a new asset by specifying a new key-value pair.
 func (t *SimpleAsset) Invoke(stub shim.ChaincodeStubInterface) peer.Response {
-	logger.Debug("Invoke() called.")
 	// Extract the function and args from the transaction proposal
+	var result string
+	var id string
+	var err error
+
 	fn, args := stub.GetFunctionAndParameters()
 
-	if fn == "set" {
-		return t.set(stub, args)
-	} else if fn == "get" {
-		return t.get(stub, args)
-	} else if fn == "getVersion" {
-		return t.getVersion(stub)
+	//checking for account level access
+	channelId := stub.GetChannelID()
+	accountAssertError := cid.AssertAttributeValue(stub, "ChannelId", channelId)
+	id, err = cid.GetID(stub)
+	if err != nil {
+		return shim.Error("error getid ")
+	}
+	logger.Debug("id: ", id)
+	if accountAssertError != nil {
+		return shim.Error(accountAssertError.Error())
 	}
 
-	logger.Error("Function declaration not found for ", fn)
-	resp := shim.Error("Invalid function name : " + fn)
-	resp.Status = 404
-	return resp
-}
+	// checking for access to app
+	chaincodeId := os.Getenv("CORE_CHAINCODE_ID_NAME")
+	pair := strings.Split(chaincodeId, ":")
+	chaincodeName := pair[0]
+	appAssertError := cid.AssertAttributeValue(stub, "AppId", chaincodeName)
+	if appAssertError != nil {
+		return shim.Error(appAssertError.Error())
+	}
 
-// getVersion retrieves the name and version of this smart contract
-func (t *SimpleAsset) getVersion(stub shim.ChaincodeStubInterface) peer.Response {
-	logger.Debug("getVersion called.")
+	fmt.Println("invoke is running " + fn)
 
-	return shim.Success([]byte("get-set:1.0.0"))
+	if fn == "set" {
+		result, err = set(stub, args)
+	} else { // assume 'get' even if fn is nil
+		result, err = get(stub, args)
+	}
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	fmt.Println("invoke returning " + result)
+	// Return the result as success payload
+	return shim.Success([]byte(result))
 }
 
 // Set stores the asset (both key and value) on the ledger. If the key exists,
 // it will override the value with the new one
-func (t *SimpleAsset) set(stub shim.ChaincodeStubInterface, args []string) peer.Response {
-	logger.Debug("set() called.")
-	creatorInBytes, err1 := stub.GetCreator()
-	if err1 != nil {
-		logger.Error("Error occured while calling GetCreator(): ", err1)
-		return shim.Error("Failed to get creator")
-	}
-	creator := fmt.Sprintf("%s", creatorInBytes)
-	logger.Debug(creator)
+func set(stub shim.ChaincodeStubInterface, args []string) (string, error) {
+	fmt.Println("- start set value")
 	if len(args) != 2 {
-		logger.Error("Incorrect number of arguments passed in set.")
-		resp := shim.Error("Incorrect number of arguments. Expecting 2 arguments: " + strconv.Itoa(len(args)) + " given.")
-		resp.Status = 400
-		return resp
+		return "", fmt.Errorf("Incorrect arguments. Expecting a key and a value")
 	}
 
 	err := stub.PutState(args[0], []byte(args[1]))
 	if err != nil {
-		logger.Error("Error occured while calling PutState(): ", err)
-		return shim.Error("Failed to set asset: " + args[0])
+		return "", fmt.Errorf("Failed to set asset: %s", args[0])
 	}
-	return shim.Success([]byte(args[0] + ":" + args[1]))
+	fmt.Println("- end set value")
+	return args[1], nil
 }
 
 // Get returns the value of the specified asset key
-func (t *SimpleAsset) get(stub shim.ChaincodeStubInterface, args []string) peer.Response {
-	logger.Debug("get() called.")
+func get(stub shim.ChaincodeStubInterface, args []string) (string, error) {
+	fmt.Println("- start get value")
 	if len(args) != 1 {
-		resp := shim.Error("Incorrect number of arguments. Expecting 1 argument: " + strconv.Itoa(len(args)) + " given.")
-		resp.Status = 400
-		return resp
+		return "", fmt.Errorf("Incorrect arguments. Expecting a key")
 	}
 
 	value, err := stub.GetState(args[0])
 	if err != nil {
-		logger.Error("Error occured while calling GetState(): ", err)
-		return shim.Error("Failed to get asset: " + args[0])
+		return "", fmt.Errorf("Failed to get asset: %s with error: %s", args[0], err)
 	}
 	if value == nil {
-		logger.Info("No data received for key : ", args[0])
-		resp := shim.Error("Asset not found: " + args[0])
-		resp.Status = 400
-		return resp
+		return "", fmt.Errorf("Asset not found: %s", args[0])
 	}
-	return shim.Success(value)
+	fmt.Println("- end get value")
+	return string(value), nil
 }
 
 // main function starts up the chaincode in the container during instantiate
 func main() {
 	if err := shim.Start(new(SimpleAsset)); err != nil {
-		logger.Error("Error starting SimpleAsset chaincode: ", err)
 		fmt.Printf("Error starting SimpleAsset chaincode: %s", err)
 	}
 }
